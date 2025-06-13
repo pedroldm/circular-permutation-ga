@@ -16,7 +16,7 @@ class Instance {
         int tools;
         int slots;
         int emptySpaces;
-        int HSCost;
+        int WSACost;
         std::vector<int> HSChromosome;
         std::vector<std::vector<int>> frequencyMatrix;
 

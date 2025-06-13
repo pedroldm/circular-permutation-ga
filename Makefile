@@ -28,9 +28,9 @@ TARGET_DEBUG := main_debug
 TARGET_PRD := main_prd
 
 # Compiler flags for each build
-CXXFLAGS := -std=c++17 -Wall -Wextra $(INCLUDE)
+CXXFLAGS := -std=c++17 -Wall -fopenmp -Wextra $(INCLUDE)
 CXXFLAGS_DEBUG := -std=c++17 -Wall -Wextra -g $(INCLUDE)
-CXXFLAGS_PRD := -std=c++17 -O3 -march=native $(INCLUDE)
+CXXFLAGS_PRD := -std=c++17 -fopenmp -O3 -march=native $(INCLUDE)
 
 # Default target is development build
 all: $(TARGET)

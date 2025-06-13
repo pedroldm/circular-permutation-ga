@@ -2,7 +2,7 @@
 
 using namespace std;
 
-Population::Population(int n) {
+Population::Population(int n) : n(n) {
     this->chromosomes.resize(n);
 }
 
@@ -18,4 +18,8 @@ Chromosome& Population::operator[](size_t index) {
 
 const Chromosome& Population::operator[](size_t index) const {
     return chromosomes[index];
+}
+
+Chromosome& Population::back() {
+    return chromosomes[n - 1];
 }

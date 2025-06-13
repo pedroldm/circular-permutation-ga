@@ -21,6 +21,7 @@ class Population {
         auto end() { return chromosomes.end(); }
         auto begin() const { return chromosomes.begin(); }
         auto end() const { return chromosomes.end(); }
+        Chromosome& back();
 };
 
 #endif

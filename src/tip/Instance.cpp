@@ -2,7 +2,7 @@
 
 using namespace std;
 
-Instance::Instance(string filePath) {
+Instance::Instance(string filePath) : filePath(filePath) {
     ifstream file(filePath);
     if (!file.is_open()) {
         throw runtime_error("Failed to open file: " + filePath);
@@ -18,7 +18,7 @@ Instance::Instance(string filePath) {
         HSChromosome[i] = (value == "x") ? -1 : stoi(value) - 1;
     }
 
-    file >> this->HSCost;
+    file >> this->WSACost;
 
     this->frequencyMatrix.resize(this->tools, vector<int>(this->tools));
     for (int i = 0; i < this->tools; i++) {

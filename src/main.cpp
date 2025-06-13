@@ -7,14 +7,17 @@ using namespace std;
 
 int main(int argc, char* argv[]) {
     string filePath;
-    int p;
-    double pe;
-    double pm;
-    double rhoe;
-    int maxGens;
-    int maxGensWithoutImprovement;
-    int threads;
-    int seed;
+    int p = 1000;
+    double pe = 0.10;
+    double pm = 0.20;
+    double rhoe = 0.60;
+    double wheelBias = 50.0;
+    int mutationType = 1;
+    int maxGens = 1000;
+    int maxGensWithoutImprovement = 1000;
+    int threads = 4;
+    int seed = 123;
+    int maxTime = 10;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -32,17 +35,34 @@ int main(int argc, char* argv[]) {
             maxGens = std::atoi(arg.substr(10).c_str());
         else if (arg.find("--maxGensWithoutImprovement=") == 0)
             maxGensWithoutImprovement = std::atoi(arg.substr(28).c_str());
+        else if (arg.find("--wheelBias=") == 0)
+            wheelBias = std::atof(arg.substr(12).c_str());
         else if (arg.find("--threads=") == 0)
             threads = std::atoi(arg.substr(10).c_str());
         else if (arg.find("--seed=") == 0)
             seed = std::atoi(arg.substr(7).c_str());
+        else if (arg.find("--maxTime=") == 0)
+            maxTime = std::atoi(arg.substr(10).c_str());
+        else if (arg.find("--mutationType=") == 0)
+            mutationType = std::atoi(arg.substr(15).c_str());
     }
 
     Instance instance(filePath);
-    GA ga(instance, instance.tools, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, threads, seed);
-    Population pop = ga.createInitialPopulation();
-    ga.calculatePopulationFitness(pop);
-    pop.sortByFitness();
-    cout << pop[0].fitness << endl;
-    ga.circularCrossover(pop[0], pop[1]);
+    GA ga(
+        instance,
+        instance.tools,
+        p,
+        pe,
+        pm,
+        rhoe,
+        maxGens,
+        maxGensWithoutImprovement,
+        wheelBias,
+        mutationType,
+        threads,
+        seed,
+        maxTime
+    );
+    ga.run();
+    ga.JSONOutput(cout);
 }
