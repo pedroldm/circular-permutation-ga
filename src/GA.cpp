@@ -193,7 +193,7 @@ void GA::calculatePopulationFitness(Population& pop) {
     }
 }
 
-void GA::JSONOutput(std::ostream& os) {
+void GA::TIPJSONOutput(std::ostream& os) {
     json j;
 
     j["instance"]["filePath"]     = this->instance.filePath;

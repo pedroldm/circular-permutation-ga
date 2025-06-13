@@ -54,7 +54,7 @@ class GA {
         void swapMutation(Chromosome& c);
         void twoOptMutation(Chromosome& c);
         void reinsertionMutation(Chromosome& c);
-        void JSONOutput(std::ostream& os);
+        void TIPJSONOutput(std::ostream& os);
 };
 
 #endif
