@@ -1,7 +1,7 @@
 #include <iostream>
 #include "../include/GA.hpp"
 #include "../include/tip/Instance.hpp"
-#include "../include/Solution.hpp"
+#include "../include/Chromosome.hpp"
 
 using namespace std;
 
@@ -40,4 +40,9 @@ int main(int argc, char* argv[]) {
 
     Instance instance(filePath);
     GA ga(instance, instance.tools, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, threads, seed);
+    Population pop = ga.createInitialPopulation();
+    ga.calculatePopulationFitness(pop);
+    pop.sortByFitness();
+    cout << pop[0].fitness << endl;
+    ga.circularCrossover(pop[0], pop[1]);
 }

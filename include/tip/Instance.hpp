@@ -1,7 +1,7 @@
 #ifndef INSTANCE_HPP
 #define INSTANCE_HPP
 
-#include "../Solution.hpp"
+#include "../Chromosome.hpp"
 
 #include <string>
 #include <vector>
@@ -15,12 +15,13 @@ class Instance {
         std::string filePath;
         int tools;
         int slots;
+        int emptySpaces;
         int HSCost;
-        std::vector<int> HSSolution;
+        std::vector<int> HSChromosome;
         std::vector<std::vector<int>> frequencyMatrix;
 
         Instance(std::string filePath);
-        int fitness(Solution s);
+        int fitness(Chromosome s);
 };
 
 #endif

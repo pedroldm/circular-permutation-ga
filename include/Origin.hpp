@@ -3,7 +3,7 @@
 
 enum class Origin {
     RANDOM,
-    CROSSOVER,
+    CYCLIC_CROSSOVER,
     MUTATION,
 };
 

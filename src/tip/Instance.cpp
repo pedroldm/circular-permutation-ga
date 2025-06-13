@@ -9,12 +9,13 @@ Instance::Instance(string filePath) {
     }
 
     file >> this->tools >> this->slots;
+    this->emptySpaces = this->slots - this->tools;
 
-    this->HSSolution.resize(this->slots);
+    this->HSChromosome.resize(this->slots);
     for (int i = 0; i < this->slots; i++) {
         string value;
         file >> value;
-        HSSolution[i] = (value == "x") ? -1 : stoi(value) - 1;
+        HSChromosome[i] = (value == "x") ? -1 : stoi(value) - 1;
     }
 
     file >> this->HSCost;
@@ -27,7 +28,7 @@ Instance::Instance(string filePath) {
     }
 }
 
-int Instance::fitness(Solution s) {
+int Instance::fitness(Chromosome s) {
     unordered_map<int, int> toolIndex;
 
     for (int i = 0; i < this->tools; i++) {
@@ -41,7 +42,7 @@ int Instance::fitness(Solution s) {
             if (!this->frequencyMatrix[i][j]) 
                 continue;
             int dist = abs(toolIndex[i] - toolIndex[j]);
-            int circularDist = min(dist, (this->tools - dist) + (this->slots - this->tools));
+            int circularDist = min(dist, (this->tools - dist) + this->emptySpaces);
             totalCost += this->frequencyMatrix[i][j] * circularDist;
         }
     }
