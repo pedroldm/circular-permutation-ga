@@ -6,14 +6,16 @@
 enum class Origin {
     RANDOM,
     CYCLIC_CROSSOVER,
+    ORDER_CROSSOVER,
     MUTATION,
 };
 
 inline std::ostream& operator<<(std::ostream& os, Origin o) {
     switch(o) {
-        case Origin::RANDOM:            return os << "INITIAL";
+        case Origin::RANDOM:             return os << "INITIAL";
         case Origin::MUTATION:           return os << "MUTATION";
         case Origin::CYCLIC_CROSSOVER:   return os << "CYCLIC_CROSSOVER";
+        case Origin::ORDER_CROSSOVER:    return os << "ORDER_CROSSOVER";
         default:                         return os << "UNKNOWN";
     }
 }
@@ -23,6 +25,7 @@ inline std::string to_string(Origin o) {
         case Origin::RANDOM:             return "INITIAL";
         case Origin::MUTATION:           return "MUTATION";
         case Origin::CYCLIC_CROSSOVER:   return "CYCLIC_CROSSOVER";
+        case Origin::ORDER_CROSSOVER:    return "ORDER_CROSSOVER";
         default:                         return "UNKNOWN";
     }
 }

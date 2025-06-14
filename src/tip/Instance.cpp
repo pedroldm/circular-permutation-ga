@@ -1,8 +1,8 @@
-#include "../../include/tip/Instance.hpp"
+#include "../../include/tip/TIPInstance.hpp"
 
 using namespace std;
 
-Instance::Instance(string filePath) : filePath(filePath) {
+TIPInstance::TIPInstance(string filePath) : filePath(filePath) {
     ifstream file(filePath);
     if (!file.is_open()) {
         throw runtime_error("Failed to open file: " + filePath);
@@ -28,7 +28,7 @@ Instance::Instance(string filePath) : filePath(filePath) {
     }
 }
 
-int Instance::fitness(Chromosome s) {
+int TIPInstance::fitness(Chromosome s) const {
     unordered_map<int, int> toolIndex;
 
     for (int i = 0; i < this->tools; i++) {

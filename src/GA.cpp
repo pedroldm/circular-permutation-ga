@@ -3,11 +3,11 @@
 using namespace std;
 using json = nlohmann::json;
 
-GA::GA(Instance instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
-       int maxGensWithoutImprovement, double wheelBias, int mutationType, int threads, int seed, int maxTime)
+GA::GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
+       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, int threads, int seed, int maxTime)
     : instance(instance), n(n), p(p), pe(pe), pm(pm), rhoe(rhoe), maxGens(maxGens), currP(p),
       maxGensWithoutImprovement(maxGensWithoutImprovement), wheelBias(wheelBias), mutationType(mutationType),
-      threads(threads), seed(seed), rng(seed), ztn(0, n - 1), maxTime(maxTime)
+      crossoverType(crossoverType), seed(seed), rng(seed), ztn(0, n - 1), coinFlip(0, 1), maxTime(maxTime)
 {
     this->currP = this->createInitialPopulation();
 }
@@ -31,6 +31,7 @@ void GA::run() {
 
         this->currP.sortByFitness();
         if(!this->convergenceLog.size() || this->currP[0].fitness < this->convergenceLog.back().bestFitness) {
+            gensWithoutImprovement = 0;
             this->convergenceLog.push_back({
                 currentGen, this->currP[0].fitness, this->currP[0].origin, std::chrono::duration<double>(currentTime - startTime).count()
             });
@@ -92,7 +93,17 @@ void GA::reproduction(Population& currP, Population& nextP) {
     for(size_t i = eliteCount + mutantsCount; i < this->p; i += 2) {
         int c1 = this->biasedWheelSelection(currP, biasedFitness, totalBiasedFitness, dist);
         int c2 = this->biasedWheelSelection(currP, biasedFitness, totalBiasedFitness, dist);
-        pair<Chromosome, Chromosome> offspring = this->cyclicCrossover(currP[c1], currP[c2]);
+        std::pair<Chromosome, Chromosome> offspring;
+        switch(this->crossoverType) {
+            case 1:
+                offspring = this->cyclicCrossover(currP[c1], currP[c2]);
+                break;
+            case 2:
+                offspring = this->orderCrossover(currP[c1], currP[c2]);
+                break;
+            case 3:
+                offspring = this->coinFlip(this->rng) ? this->cyclicCrossover(currP[c1], currP[c2]) : this->orderCrossover(currP[c1], currP[c2]);
+        }
         nextP[i] = std::move(offspring.first);
         if (i + 1 < this->p) {
             nextP[i + 1] = std::move(offspring.second);
@@ -172,6 +183,43 @@ pair<Chromosome, Chromosome> GA::cyclicCrossover(Chromosome& c1, Chromosome& c2)
     return { offspring1, offspring2 };
 }
 
+pair<Chromosome, Chromosome> GA::orderCrossover(Chromosome& c1, Chromosome& c2) {
+    Chromosome o1(this->n, -1, Origin::ORDER_CROSSOVER);
+    Chromosome o2(this->n, -1, Origin::ORDER_CROSSOVER);
+
+    size_t start = this->ztn(this->rng);
+    size_t end = this->ztn(this->rng);
+
+    if (start > end) swap(start, end);
+
+    for (size_t i = start; i <= end; ++i) {
+        o1[i] = c1[i];
+        o2[i] = c2[i];
+    }
+
+    auto fill = [&](Chromosome& offspring, Chromosome& donor) {
+        unordered_set<int> used;
+        for (size_t i = start; i <= end; ++i) {
+            used.insert(offspring[i]);
+        }
+
+        size_t pos = (end + 1) % this->n;
+        for (size_t i = 0; i < this->n; ++i) {
+            int gene = donor[(end + 1 + i) % this->n];
+            if (used.find(gene) == used.end()) {
+                offspring[pos] = gene;
+                used.insert(gene);
+                pos = (pos + 1) % this->n;
+            }
+        }
+    };
+
+    fill(o1, c2);
+    fill(o2, c1);
+
+    return {o1, o2};
+}
+
 Chromosome GA::createRandomChromosome() {
     vector<int> perm(n);
     iota(perm.begin(), perm.end(), 0);
@@ -193,14 +241,16 @@ void GA::calculatePopulationFitness(Population& pop) {
     }
 }
 
-void GA::TIPJSONOutput(std::ostream& os) {
+void GA::TIPJSONOutput(ostream& os) {
     json j;
 
-    j["instance"]["filePath"]     = this->instance.filePath;
-    j["instance"]["tools"]        = this->instance.tools;
-    j["instance"]["slots"]        = this->instance.slots;
-    j["instance"]["emptySpaces"]  = this->instance.emptySpaces;
-    j["instance"]["WSACost"]      = this->instance.WSACost;
+    const TIPInstance* instPtr = dynamic_cast<const TIPInstance*>(&this->instance);
+
+    j["instance"]["filePath"]     = instPtr->filePath;
+    j["instance"]["tools"]        = instPtr->tools;
+    j["instance"]["slots"]        = instPtr->slots;
+    j["instance"]["emptySpaces"]  = instPtr->emptySpaces;
+    j["instance"]["WSACost"]      = instPtr->WSACost;
 
     j["parameters"]["n"]                           = this->n;
     j["parameters"]["p"]                           = this->p;
@@ -226,7 +276,7 @@ void GA::TIPJSONOutput(std::ostream& os) {
     }
 
     j["top_individuals"] = json::array();
-    size_t topCount = std::min<size_t>(20, this->p);
+    size_t topCount = min<size_t>(20, this->p);
 
     for (size_t i = 0; i < topCount; ++i) {
         const Chromosome& c = this->currP[i];
@@ -237,5 +287,46 @@ void GA::TIPJSONOutput(std::ostream& os) {
         });
     }
 
-    os << std::setw(4) << j << std::endl;
+    os << setw(4) << j << endl;
+}
+
+void GA::CBPJSONOutput(ostream& os) {
+    json j;
+
+    j["parameters"]["n"]                           = this->n;
+    j["parameters"]["p"]                           = this->p;
+    j["parameters"]["pe"]                          = this->pe;
+    j["parameters"]["pm"]                          = this->pm;
+    j["parameters"]["rhoe"]                        = this->rhoe;
+    j["parameters"]["maxGens"]                     = this->maxGens;
+    j["parameters"]["maxGensWithoutImprovement"]   = this->maxGensWithoutImprovement;
+    j["parameters"]["wheelBias"]                   = this->wheelBias;
+    j["parameters"]["mutationType"]                = this->mutationType;
+    j["parameters"]["threads"]                     = this->threads;
+    j["parameters"]["seed"]                        = this->seed;
+    j["parameters"]["maxTime"]                     = this->maxTime;
+
+    j["convergence"] = json::array();
+    for (const auto& entry : this->convergenceLog) {
+        j["convergence"].push_back({
+            {"generation", entry.generation},
+            {"fitness", entry.bestFitness},
+            {"origin", to_string(entry.origin)},
+            {"elapsedSeconds", entry.elapsedSeconds}
+        });
+    }
+
+    j["top_individuals"] = json::array();
+    size_t topCount = min<size_t>(20, this->p);
+
+    for (size_t i = 0; i < topCount; ++i) {
+        const Chromosome& c = this->currP[i];
+        j["top_individuals"].push_back({
+            {"fitness", c.fitness},
+            {"origin", to_string(c.origin)},
+            {"permutation", c.permutation}
+        });
+    }
+
+    os << setw(4) << j << endl;
 }

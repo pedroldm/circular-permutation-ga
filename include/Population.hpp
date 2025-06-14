@@ -4,7 +4,6 @@
 #include <vector>
 #include <algorithm>
 #include "Chromosome.hpp"
-#include "tip/Instance.hpp"
 
 class Population {
     private:

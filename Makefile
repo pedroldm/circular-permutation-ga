@@ -7,79 +7,128 @@ INCLUDE := -Iinclude
 # Directories
 SRC_DIR := src
 SRC_TIP_DIR := src/tip
+SRC_CBP_DIR := src/cbp
 OBJ_DIR := build
 
+# Main files
+MAIN_TIP := $(SRC_DIR)/mainTIP.cpp
+MAIN_CBP := $(SRC_DIR)/mainCBP.cpp
+
 # Source files
-SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_TIP_DIR)/*.cpp)
+SRCS_COMMON := $(wildcard $(SRC_DIR)/*.cpp)
+SRCS_TIP := $(filter-out $(MAIN_CBP), $(SRCS_COMMON)) $(wildcard $(SRC_TIP_DIR)/*.cpp)
+SRCS_CBP := $(filter-out $(MAIN_TIP), $(SRCS_COMMON)) $(wildcard $(SRC_CBP_DIR)/*.cpp)
 
-# Object files for each build type
-OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(filter $(SRC_DIR)/%.cpp, $(SRCS))) \
-        $(patsubst $(SRC_TIP_DIR)/%.cpp, $(OBJ_DIR)/tip/%.o, $(filter $(SRC_TIP_DIR)/%.cpp, $(SRCS)))
+# Object files macros
+define OBJS_template
+$(patsubst %.cpp,$(OBJ_DIR)/$(1)/%.o,$(notdir $(2)))
+endef
+define OBJS_debug_template
+$(patsubst %.cpp,$(OBJ_DIR)/$(1)/%.o.debug,$(notdir $(2)))
+endef
+define OBJS_prd_template
+$(patsubst %.cpp,$(OBJ_DIR)/$(1)/%.o.prd,$(notdir $(2)))
+endef
 
-OBJS_DEBUG := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o.debug, $(filter $(SRC_DIR)/%.cpp, $(SRCS))) \
-              $(patsubst $(SRC_TIP_DIR)/%.cpp, $(OBJ_DIR)/tip/%.o.debug, $(filter $(SRC_TIP_DIR)/%.cpp, $(SRCS)))
+# Object file lists
+OBJS_TIP := $(call OBJS_template,tip,$(SRCS_TIP))
+OBJS_TIP_DEBUG := $(call OBJS_debug_template,tip,$(SRCS_TIP))
+OBJS_TIP_PRD := $(call OBJS_prd_template,tip,$(SRCS_TIP))
 
-OBJS_PRD := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o.prd, $(filter $(SRC_DIR)/%.cpp, $(SRCS))) \
-            $(patsubst $(SRC_TIP_DIR)/%.cpp, $(OBJ_DIR)/tip/%.o.prd, $(filter $(SRC_TIP_DIR)/%.cpp, $(SRCS)))
+OBJS_CBP := $(call OBJS_template,cbp,$(SRCS_CBP)) $(OBJ_DIR)/tip/Instance.o
+OBJS_CBP_DEBUG := $(call OBJS_debug_template,cbp,$(SRCS_CBP)) $(OBJ_DIR)/tip/Instance.o.debug
+OBJS_CBP_PRD := $(call OBJS_prd_template,cbp,$(SRCS_CBP)) $(OBJ_DIR)/tip/Instance.o.prd
 
-# Targets
-TARGET := main
-TARGET_DEBUG := main_debug
-TARGET_PRD := main_prd
+# Executables
+TIP := tip
+TIP_DEBUG := tip_debug
+TIP_PRD := tip_prd
 
-# Compiler flags for each build
+CBP := cbp
+CBP_DEBUG := cbp_debug
+CBP_PRD := cbp_prd
+
+# Flags
 CXXFLAGS := -std=c++17 -Wall -fopenmp -Wextra $(INCLUDE)
 CXXFLAGS_DEBUG := -std=c++17 -Wall -Wextra -g $(INCLUDE)
 CXXFLAGS_PRD := -std=c++17 -fopenmp -O3 -march=native $(INCLUDE)
 
-# Default target is development build
-all: $(TARGET)
+# Targets
+all: $(TIP)
 
-# Build targets
-dev: $(TARGET)
-debug: $(TARGET_DEBUG)
-prd: $(TARGET_PRD)
+tip: $(TIP)
+tip_debug: $(TIP_DEBUG)
+tip_prd: $(TIP_PRD)
 
-# Link executables
-$(TARGET): $(OBJS)
+cbp: $(CBP)
+cbp_debug: $(CBP_DEBUG)
+cbp_prd: $(CBP_PRD)
+
+# Linking
+$(TIP): $(OBJS_TIP)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TARGET_DEBUG): $(OBJS_DEBUG)
+$(TIP_DEBUG): $(OBJS_TIP_DEBUG)
 	$(CXX) $(CXXFLAGS_DEBUG) -o $@ $^
 
-$(TARGET_PRD): $(OBJS_PRD)
+$(TIP_PRD): $(OBJS_TIP_PRD)
 	$(CXX) $(CXXFLAGS_PRD) -o $@ $^
 
-# Compile development object files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(CBP): $(OBJS_CBP)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
+$(CBP_DEBUG): $(OBJS_CBP_DEBUG)
+	$(CXX) $(CXXFLAGS_DEBUG) -o $@ $^
+
+$(CBP_PRD): $(OBJS_CBP_PRD)
+	$(CXX) $(CXXFLAGS_PRD) -o $@ $^
+
+# Compile generic rules
 $(OBJ_DIR)/tip/%.o: $(SRC_TIP_DIR)/%.cpp | $(OBJ_DIR)/tip
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Compile debug object files
-$(OBJ_DIR)/%.o.debug: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
 
 $(OBJ_DIR)/tip/%.o.debug: $(SRC_TIP_DIR)/%.cpp | $(OBJ_DIR)/tip
 	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
 
-# Compile production object files
-$(OBJ_DIR)/%.o.prd: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS_PRD) -c $< -o $@
-
 $(OBJ_DIR)/tip/%.o.prd: $(SRC_TIP_DIR)/%.cpp | $(OBJ_DIR)/tip
 	$(CXX) $(CXXFLAGS_PRD) -c $< -o $@
 
-# Create build directories
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
+$(OBJ_DIR)/cbp/%.o: $(SRC_CBP_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+$(OBJ_DIR)/cbp/%.o.debug: $(SRC_CBP_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(OBJ_DIR)/cbp/%.o.prd: $(SRC_CBP_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS_PRD) -c $< -o $@
+
+$(OBJ_DIR)/tip/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/tip
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/tip/%.o.debug: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/tip
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(OBJ_DIR)/tip/%.o.prd: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/tip
+	$(CXX) $(CXXFLAGS_PRD) -c $< -o $@
+
+$(OBJ_DIR)/cbp/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/cbp/%.o.debug: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS_DEBUG) -c $< -o $@
+
+$(OBJ_DIR)/cbp/%.o.prd: $(SRC_DIR)/%.cpp | $(OBJ_DIR)/cbp
+	$(CXX) $(CXXFLAGS_PRD) -c $< -o $@
+
+# Directory creation
 $(OBJ_DIR)/tip:
 	mkdir -p $(OBJ_DIR)/tip
 
-# Clean rule
-clean:
-	rm -rf $(OBJ_DIR) $(TARGET) $(TARGET_DEBUG) $(TARGET_PRD)
+$(OBJ_DIR)/cbp:
+	mkdir -p $(OBJ_DIR)/cbp
 
-.PHONY: all dev debug prd clean
+# Clean
+clean:
+	rm -rf $(OBJ_DIR) $(TIP)* $(CBP)*
+
+.PHONY: all tip tip_debug tip_prd cbp cbp_debug cbp_prd clean

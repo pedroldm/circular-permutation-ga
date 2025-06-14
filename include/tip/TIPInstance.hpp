@@ -1,7 +1,8 @@
-#ifndef INSTANCE_HPP
-#define INSTANCE_HPP
+#ifndef TIPINSTANCE_HPP
+#define TIPINSTANCE_HPP
 
 #include "../Chromosome.hpp"
+#include "../InstanceInterface.hpp"
 
 #include <string>
 #include <vector>
@@ -10,7 +11,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-class Instance {
+class TIPInstance : public InstanceInterface {
     public:
         std::string filePath;
         int tools;
@@ -20,8 +21,8 @@ class Instance {
         std::vector<int> HSChromosome;
         std::vector<std::vector<int>> frequencyMatrix;
 
-        Instance(std::string filePath);
-        int fitness(Chromosome s);
+        TIPInstance(std::string filePath);
+        int fitness(Chromosome s) const override;
 };
 
 #endif

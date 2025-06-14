@@ -1,6 +1,6 @@
 #include <iostream>
 #include "../include/GA.hpp"
-#include "../include/tip/Instance.hpp"
+#include "../include/tip/TIPInstance.hpp"
 #include "../include/Chromosome.hpp"
 
 using namespace std;
@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
     double rhoe = 0.60;
     double wheelBias = 50.0;
     int mutationType = 1;
+    int crossoverType = 2;
     int maxGens = 1000;
     int maxGensWithoutImprovement = 1000;
     int threads = 4;
@@ -45,24 +46,12 @@ int main(int argc, char* argv[]) {
             maxTime = std::atoi(arg.substr(10).c_str());
         else if (arg.find("--mutationType=") == 0)
             mutationType = std::atoi(arg.substr(15).c_str());
+        else if (arg.find("--crossoverType=") == 0)
+            crossoverType = std::atoi(arg.substr(16).c_str());
     }
 
-    Instance instance(filePath);
-    GA ga(
-        instance,
-        instance.tools,
-        p,
-        pe,
-        pm,
-        rhoe,
-        maxGens,
-        maxGensWithoutImprovement,
-        wheelBias,
-        mutationType,
-        threads,
-        seed,
-        maxTime
-    );
+    TIPInstance instance(filePath);
+    GA ga(instance, instance.tools, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, wheelBias, mutationType, crossoverType, threads, seed, maxTime);
     ga.run();
-    ga.JSONOutput(cout);
+    ga.TIPJSONOutput(cout);
 }
