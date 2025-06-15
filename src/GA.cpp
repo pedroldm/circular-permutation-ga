@@ -10,7 +10,7 @@ GA::GA(InstanceInterface& instance, int n, int p, double pe, double pm, double r
       mutationType(mutationType), crossoverType(crossoverType), normalizePermutation(normalizePermutation),
       currP(p), currentGen(0), gensWithoutImprovement(0), elapsedMinutes(0),
       threads(threads), seed(seed), maxTime(maxTime),
-      rng(seed), ztn(0, n - 1), coinFlip(0, 1),
+      rng(seed), ztn(0, n - 1), coinFlip(0, 1), threeSidesCoinFlip(1, 3),
       instance(instance)
 {
     this->currP = this->createInitialPopulation();
@@ -75,16 +75,19 @@ void GA::reproduction(Population& currP, Population& nextP) {
     for(int i = eliteCount ; i < eliteCount + mutantsCount ; i++) {
         int idx = this->biasedWheelSelection(biasedFitness, dist);
         Chromosome mutant = Chromosome(currP[idx]);
-        mutant.origin = Origin::MUTATION;
-        switch(this->mutationType) {
+        int mutation = (this->mutationType == 4) ? this->mutationType : this->threeSidesCoinFlip(this->rng);
+        switch(mutation) {
             case 1:
                 this->swapMutation(mutant);
+                mutant.origin = Origin::SWAP_MUTATION;
                 break;
             case 2:
                 this->twoOptMutation(mutant);
+                mutant.origin = Origin::TWOOPT_MUTATION;
                 break;
             case 3:
                 this->reinsertionMutation(mutant);
+                mutant.origin = Origin::REINSERTION_MUTATION;
                 break;
         }
         if(this->normalizePermutation)

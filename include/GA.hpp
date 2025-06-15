@@ -42,6 +42,7 @@ class GA {
         std::mt19937 rng;
         std::uniform_int_distribution<size_t> ztn;
         std::uniform_int_distribution<size_t> coinFlip;
+        std::uniform_int_distribution<size_t> threeSidesCoinFlip;
 
         std::vector<ConvergenceEntry> convergenceLog;
 
