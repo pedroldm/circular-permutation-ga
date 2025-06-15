@@ -4,10 +4,14 @@ using namespace std;
 using json = nlohmann::json;
 
 GA::GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
-       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, int threads, int seed, int maxTime)
-    : instance(instance), n(n), p(p), pe(pe), pm(pm), rhoe(rhoe), maxGens(maxGens), currP(p),
-      maxGensWithoutImprovement(maxGensWithoutImprovement), wheelBias(wheelBias), mutationType(mutationType),
-      crossoverType(crossoverType), seed(seed), rng(seed), ztn(0, n - 1), coinFlip(0, 1), maxTime(maxTime)
+       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, int threads, int seed, int maxTime)
+    : n(n), p(p), pe(pe), pm(pm), rhoe(rhoe), maxGens(maxGens),
+      maxGensWithoutImprovement(maxGensWithoutImprovement), wheelBias(wheelBias),
+      mutationType(mutationType), crossoverType(crossoverType), normalizePermutation(normalizePermutation),
+      currP(p), currentGen(0), gensWithoutImprovement(0), elapsedMinutes(0),
+      threads(threads), seed(seed), maxTime(maxTime),
+      rng(seed), ztn(0, n - 1), coinFlip(0, 1),
+      instance(instance)
 {
     this->currP = this->createInitialPopulation();
 }
@@ -26,7 +30,7 @@ void GA::run() {
         #ifdef _OPENMP
         #pragma omp parallel for num_threads(this->threads)
         #endif
-        for(size_t i = 0 ; i < this->p ; i++)
+        for(int i = 0 ; i < this->p ; i++)
             this->currP[i].fitness = this->instance.fitness(this->currP[i]);
 
         this->currP.sortByFitness();
@@ -44,21 +48,21 @@ void GA::run() {
 }
 
 void GA::reproduction(Population& currP, Population& nextP) {
-    size_t eliteCount = (size_t)(this->pe * this->p);
-    size_t mutantsCount = (size_t)(this->pm * this->p);
+    int eliteCount = (int)(this->pe * this->p);
+    int mutantsCount = (int)(this->pm * this->p);
 
     /* Copying elite individuals to next generation */
     #ifdef _OPENMP
     #pragma omp parallel for num_threads(this->threads)
     #endif
-    for(size_t i = 0 ; i < eliteCount; i++) {
+    for(int i = 0 ; i < eliteCount; i++) {
         nextP[i] = currP[i];
     }
 
     vector<double> biasedFitness(this->p);
     double totalBiasedFitness = 0.0;
 
-    for (size_t i = 0; i < this->p; ++i) {
+    for (int i = 0; i < this->p; ++i) {
         biasedFitness[i] = pow(1.0 / currP[i].fitness, this->wheelBias);
         totalBiasedFitness += biasedFitness[i];
     }
@@ -68,9 +72,9 @@ void GA::reproduction(Population& currP, Population& nextP) {
     #ifdef _OPENMP
     #pragma omp parallel for num_threads(this->threads)
     #endif
-    for(size_t i = eliteCount ; i < eliteCount + mutantsCount ; i++) {
-        int idx = this->biasedWheelSelection(currP, biasedFitness, totalBiasedFitness, dist);
-        Chromosome mutant = Chromosome(currP[i]);
+    for(int i = eliteCount ; i < eliteCount + mutantsCount ; i++) {
+        int idx = this->biasedWheelSelection(biasedFitness, dist);
+        Chromosome mutant = Chromosome(currP[idx]);
         mutant.origin = Origin::MUTATION;
         switch(this->mutationType) {
             case 1:
@@ -83,6 +87,8 @@ void GA::reproduction(Population& currP, Population& nextP) {
                 this->reinsertionMutation(mutant);
                 break;
         }
+        if(this->normalizePermutation)
+            mutant.normalize();
         nextP[i] = mutant;
     }
 
@@ -90,9 +96,9 @@ void GA::reproduction(Population& currP, Population& nextP) {
     #ifdef _OPENMP
     #pragma omp parallel for num_threads(this->threads)
     #endif
-    for(size_t i = eliteCount + mutantsCount; i < this->p; i += 2) {
-        int c1 = this->biasedWheelSelection(currP, biasedFitness, totalBiasedFitness, dist);
-        int c2 = this->biasedWheelSelection(currP, biasedFitness, totalBiasedFitness, dist);
+    for(int i = eliteCount + mutantsCount; i < this->p; i += 2) {
+        int c1 = this->biasedWheelSelection(biasedFitness, dist);
+        int c2 = this->biasedWheelSelection(biasedFitness, dist);
         std::pair<Chromosome, Chromosome> offspring;
         switch(this->crossoverType) {
             case 1:
@@ -104,6 +110,10 @@ void GA::reproduction(Population& currP, Population& nextP) {
             case 3:
                 offspring = this->coinFlip(this->rng) ? this->cyclicCrossover(currP[c1], currP[c2]) : this->orderCrossover(currP[c1], currP[c2]);
         }
+        if(this->normalizePermutation) {
+            offspring.first.normalize();
+            offspring.second.normalize();
+        }
         nextP[i] = std::move(offspring.first);
         if (i + 1 < this->p) {
             nextP[i + 1] = std::move(offspring.second);
@@ -111,10 +121,10 @@ void GA::reproduction(Population& currP, Population& nextP) {
     }
 }
 
-int GA::biasedWheelSelection(Population& p, std::vector<double>& biasedFitness, double& totalBiasedFitness, std::uniform_real_distribution<double>& dist) {
+int GA::biasedWheelSelection(std::vector<double>& biasedFitness, std::uniform_real_distribution<double>& dist) {
     double r = dist(rng);
     double accum = 0.0;
-    for (size_t i = 0; i < this->p; ++i) {
+    for (int i = 0; i < this->p; ++i) {
         accum += biasedFitness[i];
         if (accum >= r) {
             return i;
@@ -124,8 +134,8 @@ int GA::biasedWheelSelection(Population& p, std::vector<double>& biasedFitness, 
 }
 
 void GA::swapMutation(Chromosome& c) {
-    size_t i = this->ztn(this->rng);
-    size_t j = this->ztn(this->rng);
+    int i = this->ztn(this->rng);
+    int j = this->ztn(this->rng);
     while (j == i)
         j = this->ztn(this->rng);
 
@@ -133,8 +143,8 @@ void GA::swapMutation(Chromosome& c) {
 }
 
 void GA::twoOptMutation(Chromosome& c) {
-    size_t i = this->ztn(this->rng);
-    size_t j = this->ztn(this->rng);
+    int i = this->ztn(this->rng);
+    int j = this->ztn(this->rng);
     while(i == j)
         j = this->ztn(this->rng);
     if (i > j) 
@@ -144,8 +154,8 @@ void GA::twoOptMutation(Chromosome& c) {
 }
 
 void GA::reinsertionMutation(Chromosome& c) {
-    size_t from = this->ztn(this->rng);
-    size_t to = this->ztn(this->rng);
+    int from = this->ztn(this->rng);
+    int to = this->ztn(this->rng);
     while (to == from) {
         to = this->ztn(this->rng);
     }
@@ -160,12 +170,12 @@ pair<Chromosome, Chromosome> GA::cyclicCrossover(Chromosome& c1, Chromosome& c2)
     Chromosome offspring2(this->n, -1, Origin::CYCLIC_CROSSOVER);
     vector<bool> visited(this->n, false);
 
-    unordered_map<int, size_t> c1IndexValueMap;
-    for (size_t i = 0; i < this->n; ++i) {
+    unordered_map<int, int> c1IndexValueMap;
+    for (int i = 0; i < this->n; ++i) {
         c1IndexValueMap[c1[i]] = i;
     }
 
-    size_t idx = this->ztn(this->rng);
+    int idx = this->ztn(this->rng);
     while (!visited[idx]) {
         visited[idx] = true;
         offspring1[idx] = c1[idx];
@@ -173,7 +183,7 @@ pair<Chromosome, Chromosome> GA::cyclicCrossover(Chromosome& c1, Chromosome& c2)
         idx = c1IndexValueMap[c2[idx]];
     }
 
-    for (size_t i = 0; i < this->n; ++i) {
+    for (int i = 0; i < this->n; ++i) {
         if (!visited[i]) {
             offspring1[i] = c2[i];
             offspring2[i] = c1[i];
@@ -187,24 +197,24 @@ pair<Chromosome, Chromosome> GA::orderCrossover(Chromosome& c1, Chromosome& c2) 
     Chromosome o1(this->n, -1, Origin::ORDER_CROSSOVER);
     Chromosome o2(this->n, -1, Origin::ORDER_CROSSOVER);
 
-    size_t start = this->ztn(this->rng);
-    size_t end = this->ztn(this->rng);
+    int start = this->ztn(this->rng);
+    int end = this->ztn(this->rng);
 
     if (start > end) swap(start, end);
 
-    for (size_t i = start; i <= end; ++i) {
+    for (int i = start; i <= end; ++i) {
         o1[i] = c1[i];
         o2[i] = c2[i];
     }
 
     auto fill = [&](Chromosome& offspring, Chromosome& donor) {
         unordered_set<int> used;
-        for (size_t i = start; i <= end; ++i) {
+        for (int i = start; i <= end; ++i) {
             used.insert(offspring[i]);
         }
 
-        size_t pos = (end + 1) % this->n;
-        for (size_t i = 0; i < this->n; ++i) {
+        int pos = (end + 1) % this->n;
+        for (int i = 0; i < this->n; ++i) {
             int gene = donor[(end + 1 + i) % this->n];
             if (used.find(gene) == used.end()) {
                 offspring[pos] = gene;
@@ -229,8 +239,10 @@ Chromosome GA::createRandomChromosome() {
 
 Population GA::createInitialPopulation() {
     Population pop = Population(this->p);
-    for(unsigned i = 0 ; i < this->p ; i++) {
+    for(int i = 0 ; i < this->p ; i++) {
         pop[i] = this->createRandomChromosome();
+        if(this->normalizePermutation)
+            pop[i].normalize();
     }
     return pop;
 }
@@ -276,9 +288,9 @@ void GA::TIPJSONOutput(ostream& os) {
     }
 
     j["top_individuals"] = json::array();
-    size_t topCount = min<size_t>(20, this->p);
+    int topCount = min<int>(20, this->p);
 
-    for (size_t i = 0; i < topCount; ++i) {
+    for (int i = 0; i < topCount; ++i) {
         const Chromosome& c = this->currP[i];
         j["top_individuals"].push_back({
             {"fitness", c.fitness},
@@ -317,9 +329,9 @@ void GA::CBPJSONOutput(ostream& os) {
     }
 
     j["top_individuals"] = json::array();
-    size_t topCount = min<size_t>(20, this->p);
+    int topCount = min<int>(20, this->p);
 
-    for (size_t i = 0; i < topCount; ++i) {
+    for (int i = 0; i < topCount; ++i) {
         const Chromosome& c = this->currP[i];
         j["top_individuals"].push_back({
             {"fitness", c.fitness},

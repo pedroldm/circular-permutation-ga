@@ -5,7 +5,7 @@
       "name": "Debug",
       "type": "cppdbg",
       "request": "launch",
-      "program": "/home/pedrowsl/circular-permutation-ga/main_debug",
+      "program": "/mnt/c/Users/pedro/OneDrive/Área de Trabalho/circular-permutation-ga/tip_debug",
       "args": [
         "--filePath=${input:filePath}",
         "--p=${input:p}",
@@ -31,7 +31,7 @@
       "id": "filePath",
       "type": "promptString",
       "description": "Enter file path",
-      "default": "/home/pedrowsl/circular-permutation-ga/input/tip/instances/o/o-10_t.txt"
+      "default": "/mnt/c/Users/pedro/OneDrive/Área de Trabalho/circular-permutation-ga/input/tip/instances/o/o-10_t.txt"
     },
     {
       "id": "p",

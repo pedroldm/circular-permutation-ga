@@ -29,6 +29,7 @@ class GA {
         double wheelBias;
         int mutationType;
         int crossoverType;
+        bool normalizePermutation;
         Population currP;
 
         int currentGen;
@@ -46,15 +47,15 @@ class GA {
 
         InstanceInterface& instance;
     public:
-        GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens, 
-            int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, int threads, int seed, int maxTime);
+        GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
+       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, int threads, int seed, int maxTime);
         void run();
         std::pair<Chromosome, Chromosome> cyclicCrossover(Chromosome& c1, Chromosome& c2);
         Chromosome createRandomChromosome();
         Population createInitialPopulation();
         void calculatePopulationFitness(Population& pop);
         void reproduction(Population& currP, Population& nextP);
-        int biasedWheelSelection(Population& p, std::vector<double>& biasedFitness, double& totalBiasedFitness, std::uniform_real_distribution<double>& dist);
+        int biasedWheelSelection(std::vector<double>& biasedFitness, std::uniform_real_distribution<double>& dist);
         void swapMutation(Chromosome& c);
         void twoOptMutation(Chromosome& c);
         void reinsertionMutation(Chromosome& c);
