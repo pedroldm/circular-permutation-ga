@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     double pe = 0.10;
     double pm = 0.20;
     double rhoe = 0.60;
-    double wheelBias = 50.0;
+    double wheelBias = 0.0;
     int mutationType = 1;
     int crossoverType = 2;
     int maxGens = 1000;
@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
     int seed = 123;
     int maxTime = 10;
     bool normalizePermutation = false;
+    bool debugBias = false;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -49,12 +50,14 @@ int main(int argc, char* argv[]) {
             mutationType = std::atoi(arg.substr(15).c_str());
         else if (arg.find("--crossoverType=") == 0)
             crossoverType = std::atoi(arg.substr(16).c_str());
+        else if (arg.find("--debugBias=") == 0)
+            debugBias = std::atoi(arg.substr(12).c_str());
         else if (arg.find("--normalizePermutation=") == 0)
             normalizePermutation = std::atoi(arg.substr(23).c_str());
     }
 
     TIPInstance instance(filePath);
-    GA ga(instance, instance.tools, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, wheelBias, mutationType, crossoverType, normalizePermutation, threads, seed, maxTime);
+    GA ga(instance, instance.tools, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, wheelBias, mutationType, crossoverType, normalizePermutation, debugBias, threads, seed, maxTime);
     ga.run();
     ga.TIPJSONOutput(cout);
 }

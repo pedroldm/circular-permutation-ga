@@ -12,6 +12,7 @@
 #include <random>
 #include <vector>
 #include <numeric>
+#include <mutex>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -30,6 +31,7 @@ class GA {
         int mutationType;
         int crossoverType;
         bool normalizePermutation;
+        bool debugBias;
         Population currP;
 
         int currentGen;
@@ -45,11 +47,12 @@ class GA {
         std::uniform_int_distribution<size_t> threeSidesCoinFlip;
 
         std::vector<ConvergenceEntry> convergenceLog;
+        std::vector<std::vector<int>> biasLog;
 
         InstanceInterface& instance;
     public:
         GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
-       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, int threads, int seed, int maxTime);
+       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, bool debugBias, int threads, int seed, int maxTime);
         void run();
         std::pair<Chromosome, Chromosome> cyclicCrossover(Chromosome& c1, Chromosome& c2);
         Chromosome createRandomChromosome();

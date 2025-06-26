@@ -4,16 +4,18 @@ using namespace std;
 using json = nlohmann::json;
 
 GA::GA(InstanceInterface& instance, int n, int p, double pe, double pm, double rhoe, int maxGens,
-       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, int threads, int seed, int maxTime)
+       int maxGensWithoutImprovement, double wheelBias, int mutationType, int crossoverType, bool normalizePermutation, bool debugBias, int threads, int seed, int maxTime)
     : n(n), p(p), pe(pe), pm(pm), rhoe(rhoe), maxGens(maxGens),
       maxGensWithoutImprovement(maxGensWithoutImprovement), wheelBias(wheelBias),
-      mutationType(mutationType), crossoverType(crossoverType), normalizePermutation(normalizePermutation),
+      mutationType(mutationType), crossoverType(crossoverType), normalizePermutation(normalizePermutation), debugBias(debugBias),
       currP(p), currentGen(0), gensWithoutImprovement(0), elapsedMinutes(0),
       threads(threads), seed(seed), maxTime(maxTime),
       rng(seed), ztn(0, n - 1), coinFlip(0, 1), threeSidesCoinFlip(1, 3),
       instance(instance)
 {
     this->currP = this->createInitialPopulation();
+    if(this->debugBias)
+        this->biasLog.resize(this->maxGens);
 }
 
 void GA::run() {
@@ -21,7 +23,7 @@ void GA::run() {
     this->gensWithoutImprovement = 0;
     auto startTime = chrono::steady_clock::now();
 
-    while(currentGen++ < this->maxGens && gensWithoutImprovement++ < this->maxGensWithoutImprovement) {
+    while(this->currentGen++ < this->maxGens && gensWithoutImprovement++ < this->maxGensWithoutImprovement) {
         auto currentTime = chrono::steady_clock::now();
         this->elapsedMinutes = chrono::duration_cast<chrono::minutes>(currentTime - startTime).count();
         if (this->elapsedMinutes >= this->maxTime)
@@ -37,7 +39,7 @@ void GA::run() {
         if(!this->convergenceLog.size() || this->currP[0].fitness < this->convergenceLog.back().bestFitness) {
             gensWithoutImprovement = 0;
             this->convergenceLog.push_back({
-                currentGen, this->currP[0].fitness, this->currP[0].origin, std::chrono::duration<double>(currentTime - startTime).count()
+                this->currentGen, this->currP[0].fitness, this->currP[0].origin, chrono::duration<double>(currentTime - startTime).count()
             });
         }
 
@@ -60,20 +62,42 @@ void GA::reproduction(Population& currP, Population& nextP) {
     }
 
     vector<double> biasedFitness(this->p);
-    double totalBiasedFitness = 0.0;
+    double maxFitness = -currP[0].fitness;
+    double minFitness = -currP.back().fitness;
 
-    for (int i = 0; i < this->p; ++i) {
-        biasedFitness[i] = pow(1.0 / currP[i].fitness, this->wheelBias);
-        totalBiasedFitness += biasedFitness[i];
+    double maxScore = -numeric_limits<double>::infinity();
+    for (int i = 0; i < this->p; i++) {
+        double normFitness = (currP[i].fitness - minFitness) / (maxFitness - minFitness + 1e-9);
+        double score = -normFitness * this->wheelBias;
+        biasedFitness[i] = score;
+        if (score > maxScore)
+            maxScore = score;
     }
-    uniform_real_distribution<double> dist(0.0, totalBiasedFitness);
+
+    double sum = 0.0;
+    for (int i = 0; i < this->p; i++) {
+        biasedFitness[i] = exp(biasedFitness[i] - maxScore);
+        sum += biasedFitness[i];
+    }
+
+    for (int i = 0; i < this->p; i++) {
+        biasedFitness[i] /= sum;
+    }
+
+    discrete_distribution<int> dist(biasedFitness.begin(), biasedFitness.end());
 
     /* Generating mutant individuals to next generation */
     #ifdef _OPENMP
     #pragma omp parallel for num_threads(this->threads)
     #endif
     for(int i = eliteCount ; i < eliteCount + mutantsCount ; i++) {
-        int idx = this->biasedWheelSelection(biasedFitness, dist);
+        int idx = dist(this->rng);
+        if(this->debugBias) {
+            #pragma omp critical 
+            {
+                this->biasLog[this->currentGen - 1].push_back(idx);
+            }
+        }
         Chromosome mutant = Chromosome(currP[idx]);
         int mutation = (this->mutationType == 4) ? this->mutationType : this->threeSidesCoinFlip(this->rng);
         switch(mutation) {
@@ -100,9 +124,16 @@ void GA::reproduction(Population& currP, Population& nextP) {
     #pragma omp parallel for num_threads(this->threads)
     #endif
     for(int i = eliteCount + mutantsCount; i < this->p; i += 2) {
-        int c1 = this->biasedWheelSelection(biasedFitness, dist);
-        int c2 = this->biasedWheelSelection(biasedFitness, dist);
-        std::pair<Chromosome, Chromosome> offspring;
+        int c1 = dist(this->rng);
+        int c2 = dist(this->rng);
+        if(this->debugBias) {
+            #pragma omp critical 
+            {
+                this->biasLog[this->currentGen - 1].push_back(c1);
+                this->biasLog[this->currentGen - 1].push_back(c2);
+            }
+        }
+        pair<Chromosome, Chromosome> offspring;
         switch(this->crossoverType) {
             case 1:
                 offspring = this->cyclicCrossover(currP[c1], currP[c2]);
@@ -117,23 +148,11 @@ void GA::reproduction(Population& currP, Population& nextP) {
             offspring.first.normalize();
             offspring.second.normalize();
         }
-        nextP[i] = std::move(offspring.first);
+        nextP[i] = move(offspring.first);
         if (i + 1 < this->p) {
-            nextP[i + 1] = std::move(offspring.second);
+            nextP[i + 1] = move(offspring.second);
         }
     }
-}
-
-int GA::biasedWheelSelection(std::vector<double>& biasedFitness, std::uniform_real_distribution<double>& dist) {
-    double r = dist(rng);
-    double accum = 0.0;
-    for (int i = 0; i < this->p; ++i) {
-        accum += biasedFitness[i];
-        if (accum >= r) {
-            return i;
-        }
-    }
-    return this->n - 1;
 }
 
 void GA::swapMutation(Chromosome& c) {
@@ -142,7 +161,7 @@ void GA::swapMutation(Chromosome& c) {
     while (j == i)
         j = this->ztn(this->rng);
 
-    std::swap(c.permutation[i], c.permutation[j]);
+    swap(c.permutation[i], c.permutation[j]);
 }
 
 void GA::twoOptMutation(Chromosome& c) {
@@ -151,9 +170,9 @@ void GA::twoOptMutation(Chromosome& c) {
     while(i == j)
         j = this->ztn(this->rng);
     if (i > j) 
-        std::swap(i, j);
+        swap(i, j);
 
-    std::reverse(c.permutation.begin() + i, c.permutation.begin() + j + 1);
+    reverse(c.permutation.begin() + i, c.permutation.begin() + j + 1);
 }
 
 void GA::reinsertionMutation(Chromosome& c) {
@@ -300,6 +319,13 @@ void GA::TIPJSONOutput(ostream& os) {
             {"origin", to_string(c.origin)},
             {"permutation", c.permutation}
         });
+    }
+
+    if (this->debugBias) {
+        j["bias_log"] = json::array();
+        for (const auto& generationLog : this->biasLog) {
+            j["bias_log"].push_back(generationLog);
+        }
     }
 
     os << setw(4) << j << endl;

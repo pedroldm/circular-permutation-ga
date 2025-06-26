@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
     int seed = 123;
     int maxTime = 10;
     bool normalizePermutation = false;
+    bool debugBias = false;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -54,7 +55,7 @@ int main(int argc, char* argv[]) {
     }
 
     CBPInstance instance(filePath);
-    GA ga(instance, instance.nodeCount, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, wheelBias, mutationType, crossoverType, normalizePermutation, threads, seed, maxTime);
+    GA ga(instance, instance.nodeCount, p, pe, pm, rhoe, maxGens, maxGensWithoutImprovement, wheelBias, mutationType, crossoverType, normalizePermutation, debugBias, threads, seed, maxTime);
     ga.run();
     ga.CBPJSONOutput(cout);
 }
